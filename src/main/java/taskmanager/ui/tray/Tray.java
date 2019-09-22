@@ -1,6 +1,11 @@
 package taskmanager.ui.tray;
 
 import config.Config;
+import dorkbox.systemTray.Checkbox;
+import dorkbox.systemTray.Menu;
+import dorkbox.systemTray.MenuItem;
+import dorkbox.systemTray.Separator;
+import dorkbox.systemTray.SystemTray;
 import taskmanager.SystemInformation;
 import taskmanager.ui.ApplicationCallback;
 import taskmanager.ui.ColorUtils;
@@ -11,17 +16,15 @@ import taskmanager.ui.performance.GraphType;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.Image;
-import java.awt.Menu;
-import java.awt.MenuItem;
-import java.awt.PopupMenu;
 import java.awt.RenderingHints;
-import java.awt.TrayIcon;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-public class Tray extends TrayIcon {
+public class Tray {
+	private SystemTray tray;
+
 	private Image applicationIcon;
 	private BufferedImage iconImage;
 	private Graphics2D imageGraphics;
@@ -29,42 +32,46 @@ public class Tray extends TrayIcon {
 	private SystemInformation latestInfo;
 	private GraphType graphTypeToDisplay;
 
-	public Tray(ApplicationCallback application, Image image) {
-		super(image);
+
+	public Tray(SystemTray tray, ApplicationCallback application, Image image) {
+		this.tray = tray;
+
+		tray.setImage(image);
+
 		applicationIcon = image;
 
-		setImageAutoSize(true);
-
-		PopupMenu popupMenu = new PopupMenu();
+		Menu popupMenu = tray.getMenu();
 
 		Menu selectedGraphItem = new Menu("Selected graph");
-
-		AwtRadioButtonMenuItem noneItem = new AwtRadioButtonMenuItem("None");
-		AwtRadioButtonMenuItem cpuItem = new AwtRadioButtonMenuItem("CPU");
-		AwtRadioButtonMenuItem memoryItem = new AwtRadioButtonMenuItem("Memory");
-		noneItem.setActionListener(e -> setGraphType(null));
-		cpuItem.setActionListener(e -> setGraphType(GraphType.Cpu));
-		memoryItem.setActionListener(e -> setGraphType(GraphType.Memory));
+		Checkbox noneItem = new Checkbox("None");
+		Checkbox cpuItem = new Checkbox("CPU");
+		Checkbox memoryItem = new Checkbox("Memory");
+		noneItem.setCallback(e -> setGraphType(null));
+		cpuItem.setCallback(e -> setGraphType(GraphType.Cpu));
+		memoryItem.setCallback(e -> setGraphType(GraphType.Memory));
 		selectedGraphItem.add(noneItem);
 		selectedGraphItem.add(cpuItem);
 		selectedGraphItem.add(memoryItem);
 		popupMenu.add(selectedGraphItem);
 
-		AwtButtonGroup group = new AwtButtonGroup();
-		group.addButtons(noneItem, cpuItem, memoryItem);
+		// TODO Missing radio button support
+//		ButtonGroup group = new ButtonGroup();
+//		group.add(noneItem);
+//		group.add(cpuItem);
+//		group.add(memoryItem);
 
-		popupMenu.addSeparator();
+		popupMenu.add(new Separator());
 
 		MenuItem messageItem = new MenuItem("Restore");
-		messageItem.addActionListener(e -> application.focus());
+		messageItem.setCallback(e -> application.focus());
 		popupMenu.add(messageItem);
 
 		MenuItem closeItem = new MenuItem("Close");
-		closeItem.addActionListener(e -> application.exit());
+		closeItem.setCallback(e -> application.exit());
 		popupMenu.add(closeItem);
-		setPopupMenu(popupMenu);
 
-		addActionListener(e -> application.focus());
+		// Missing double click support
+//		addActionListener(e -> application.focus());
 
 		iconImage = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
 		imageGraphics = iconImage.createGraphics();
@@ -74,23 +81,27 @@ public class Tray extends TrayIcon {
 		String graphName = Config.get(Config.KEY_TRAY_GRAPH);
 		if (graphName.isEmpty()) {
 			setGraphType(null);
-			noneItem.setState(true);
+			noneItem.setChecked(true);
 		} else if (graphName.equals(GraphType.Cpu.name())){
 			setGraphType(GraphType.Cpu);
-			cpuItem.setState(true);
+			cpuItem.setChecked(true);
 		} else if (graphName.equals(GraphType.Memory.name())){
 			setGraphType(GraphType.Memory);
-			memoryItem.setState(true);
+			memoryItem.setChecked(true);
 		}
+	}
+
+	public void dispose() {
+		tray.shutdown();
 	}
 
 	private void setGraphType(GraphType type) {
 		graphTypeToDisplay = type;
 		if (graphTypeToDisplay == null) {
-			setImage(applicationIcon);
+			tray.setImage(applicationIcon);
 		} else if (latestInfo != null) {
 			updateIconImage(latestInfo);
-			setImage(iconImage);
+			tray.setImage(iconImage);
 		}
 
 		Config.put(Config.KEY_TRAY_GRAPH, type == null ? "" : type.name());
@@ -99,14 +110,14 @@ public class Tray extends TrayIcon {
 	public void update(SystemInformation info) {
 		latestInfo = info;
 
-		setToolTip(String.format(" CPU: %s\n Memory: %s / %s",
+		tray.setTooltip(String.format(" CPU: %s\n Memory: %s / %s",
 				TextUtils.valueToString(info.cpuUsageTotal.newest(), ValueType.Percentage),
 				TextUtils.valueToString(info.physicalMemoryUsed.newest(), ValueType.Bytes),
 				TextUtils.valueToString(info.physicalMemoryTotal, ValueType.Bytes)));
 
 		if (graphTypeToDisplay != null) {
 			updateIconImage(info);
-			setImage(iconImage);
+			tray.setImage(iconImage);
 		}
 	}
 

@@ -2,6 +2,7 @@ package taskmanager.ui;
 
 import config.Config;
 import config.TextureStorage;
+import dorkbox.systemTray.SystemTray;
 import taskmanager.DataCollector;
 import taskmanager.InformationUpdateCallback;
 import taskmanager.Process;
@@ -16,10 +17,8 @@ import javax.swing.JFrame;
 import javax.swing.JTabbedPane;
 import javax.swing.ToolTipManager;
 import javax.swing.UnsupportedLookAndFeelException;
-import java.awt.AWTException;
 import java.awt.Dimension;
 import java.awt.Image;
-import java.awt.SystemTray;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.WindowAdapter;
@@ -66,16 +65,11 @@ public class TaskManager extends JFrame implements InformationUpdateCallback, Pr
 		addWindowStateListener(windowListener);
 		addComponentListener(componentListener);
 
-		if (!SystemTray.isSupported()) {
+		SystemTray tray = SystemTray.get();
+		if (tray == null) {
 			System.out.println("No system tray support!");
 		} else {
-			try {
-				trayIcon = new Tray(this, TextureStorage.instance().getTexture("icon_small"));
-				SystemTray.getSystemTray().add(trayIcon);
-			} catch (AWTException e) {
-				System.out.println("Failed to create tray icon");
-				e.printStackTrace();
-			}
+			trayIcon = new Tray(tray, this, TextureStorage.instance().getTexture("icon_small"));
 		}
 
 		dataCollector.init();
@@ -199,7 +193,7 @@ public class TaskManager extends JFrame implements InformationUpdateCallback, Pr
 		}
 		dispose();
 		if (trayIcon != null) {
-			SystemTray.getSystemTray().remove(trayIcon);
+			trayIcon.dispose();
 		}
 	}
 
